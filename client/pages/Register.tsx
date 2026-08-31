@@ -120,8 +120,8 @@ export default function Register() {
       newErrors.birthDate = "تاريخ الميلاد مطلوب";
     } else {
       const age = calculateAge(formData.birthDate);
-      if (age === null || age < 10 || age >= 17) {
-        newErrors.birthDate = "العمر يجب أن يكون بين 10 و 16 سنة";
+      if (age === null || age < 10 || age > 19) {
+        newErrors.birthDate = "العمر يجب أن يكون بين 10 و 19 سنة";
       }
     }
     if (!formData.gender) {
