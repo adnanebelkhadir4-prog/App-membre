@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
@@ -24,6 +24,7 @@ interface RegistrationData {
   guardianLastName?: string;
   guardianRelationship?: string;
   guardianPhone?: string;
+  fatherPhone?: string;
   homePhone?: string;
 }
 
@@ -36,29 +37,12 @@ export default function AccountConfirmation() {
   const [pdfUrl, setPdfUrl] = useState<string>("");
   const [qrCode, setQrCode] = useState<string>("");
   const [generating, setGenerating] = useState(false);
+  const autoGenerationStarted = useRef(false);
 
   // Get registration data from location state
   const registrationData: RegistrationData = location.state?.data || {};
   const userId: string = location.state?.userId || "";
   const memberId: string = location.state?.memberId || generateMemberId(registrationData.gender || "male");
-
-  // Redirect if no data provided
-  if (!userId || !registrationData.firstName) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-purple-50 flex items-center justify-center" dir="rtl">
-        <div className="bg-white rounded-lg shadow-lg p-8 text-center max-w-md">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">خطأ</h1>
-          <p className="text-gray-600 mb-6">لم يتم العثور على بيانات التسجيل</p>
-          <Link
-            to="/register"
-            className="inline-block bg-gradient-to-l from-red-600 to-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:shadow-lg transition-shadow"
-          >
-            العودة إلى التسجيل
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const generatePDF = async () => {
     if (!pdfRef.current) return;
@@ -132,6 +116,31 @@ export default function AccountConfirmation() {
     }
   };
 
+  useEffect(() => {
+    if (!userId || !registrationData.firstName || autoGenerationStarted.current) return;
+
+    autoGenerationStarted.current = true;
+    void generatePDF();
+  }, [userId, registrationData.firstName, memberId]);
+
+  // Redirect if no data provided
+  if (!userId || !registrationData.firstName) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-white to-purple-50 flex items-center justify-center" dir="rtl">
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center max-w-md">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">خطأ</h1>
+          <p className="text-gray-600 mb-6">لم يتم العثور على بيانات التسجيل</p>
+          <Link
+            to="/register"
+            className="inline-block bg-gradient-to-l from-red-600 to-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:shadow-lg transition-shadow"
+          >
+            العودة إلى التسجيل
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert("تم النسخ!");
@@ -147,9 +156,10 @@ export default function AccountConfirmation() {
           firstName={registrationData.firstName || ""}
           lastName={registrationData.lastName || ""}
           memberId={memberId}
-          gender={registrationData.gender}
+          birthDate={registrationData.birthDate}
           patrol={registrationData.patrol}
-          role={registrationData.role}
+          role={registrationData.roleName || registrationData.role}
+          guardianPhone={registrationData.guardianPhone || registrationData.fatherPhone}
           qrCodeUrl={qrCode}
         />
       </div>
@@ -260,19 +270,9 @@ export default function AccountConfirmation() {
           <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">تحميل شهادة التأكيد</h2>
 
           {!pdfGenerated ? (
-            <button
-              onClick={generatePDF}
-              disabled={generating}
-              className="w-full font-bold py-3 px-6 rounded-lg transition-shadow text-white"
-              style={{
-                background: generating
-                  ? "#9ca3af"
-                  : "linear-gradient(to left, #2563eb, #7c3aed)",
-                opacity: generating ? 0.5 : 1,
-              }}
-            >
-              {generating ? "جاري إنشاء PDF..." : "إنشاء ملف PDF"}
-            </button>
+            <p className="text-center text-gray-600">
+              {generating ? "جاري إنشاء وحفظ المستندات..." : "جاري تحضير المستندات..."}
+            </p>
           ) : (
             <div className="space-y-6">
               {/* PDF Download Button */}
