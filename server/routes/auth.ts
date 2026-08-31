@@ -1,6 +1,7 @@
 import { RequestHandler } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { randomInt } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 function getSupabaseAdminClient() {
@@ -25,6 +26,15 @@ function normalizeIdentifier(value: unknown): string {
   // browsers don't do. Without this, a login typed correctly on a phone can
   // fail to match a record saved/typed with different casing on the web.
   return typeof value === "string" ? value.replace(/\s+/g, "").toLowerCase() : "";
+}
+
+function generateMemberId(gender: unknown): string {
+  const prefix = typeof gender === "string" && gender.toLowerCase() === "female" ? "F" : "E";
+  return `${prefix}${randomInt(1000, 10000)}`;
+}
+
+function isGeneratedIdConflict(error: { code?: string; message?: string; details?: string } | null): boolean {
+  return error?.code === "23505" && /generated_id/i.test(`${error.message || ""} ${error.details || ""}`);
 }
 
 function decodeDataUrl(value: unknown, expectedMimeType: string) {
@@ -101,11 +111,13 @@ export const handleRegister: RequestHandler = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Insert into users table
-    const { data, error } = await getSupabaseAdminClient()
+    const adminClient = getSupabaseAdminClient();
+    const passwordHash = await bcrypt.hash(password, 12);
+    let registrationResult = await adminClient
       .from("users")
       .insert([
         {
+          generated_id: generateMemberId(gender),
           first_name: normalizedFirstName,
           last_name: normalizedLastName,
           birth_date,
@@ -123,12 +135,43 @@ export const handleRegister: RequestHandler = async (req, res) => {
           mother_phone,
           home_phone,
           additional_info,
-          password: await bcrypt.hash(password, 12),
+          password: passwordHash,
         },
       ])
       .select()
       .single();
 
+    for (let attempt = 1; attempt < 10 && isGeneratedIdConflict(registrationResult.error); attempt++) {
+      registrationResult = await adminClient
+        .from("users")
+        .insert([
+          {
+            generated_id: generateMemberId(gender),
+            first_name: normalizedFirstName,
+            last_name: normalizedLastName,
+            birth_date,
+            gender,
+            user_phone: normalizedUserPhone,
+            patrol_id,
+            role_id,
+            is_high_patrol: is_high_patrol || false,
+            guardian_first_name,
+            guardian_last_name,
+            guardian_relationship,
+            guardian_relationship_other,
+            guardian_cin,
+            father_phone,
+            mother_phone,
+            home_phone,
+            additional_info,
+            password: passwordHash,
+          },
+        ])
+        .select()
+        .single();
+    }
+
+    const { data, error } = registrationResult;
     if (error) {
       console.error("Supabase error:", error);
       return res
