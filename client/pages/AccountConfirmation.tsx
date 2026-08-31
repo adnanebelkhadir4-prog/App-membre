@@ -24,6 +24,7 @@ interface RegistrationData {
   guardianLastName?: string;
   guardianRelationship?: string;
   guardianPhone?: string;
+  fatherPhone?: string;
   homePhone?: string;
 }
 
@@ -155,9 +156,10 @@ export default function AccountConfirmation() {
           firstName={registrationData.firstName || ""}
           lastName={registrationData.lastName || ""}
           memberId={memberId}
-          gender={registrationData.gender}
+          birthDate={registrationData.birthDate}
           patrol={registrationData.patrol}
-          role={registrationData.role}
+          role={registrationData.roleName || registrationData.role}
+          guardianPhone={registrationData.guardianPhone || registrationData.fatherPhone}
           qrCodeUrl={qrCode}
         />
       </div>
